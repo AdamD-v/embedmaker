@@ -1,0 +1,47 @@
+from flask import Flask, request, send_file
+from io import BytesIO
+from PIL import Image, ImageDraw, ImageFont
+import re
+
+app = Flask(__name__)
+
+def hex_to_rgb(value):
+    value = value.lstrip('#')
+    lv = len(value)
+    return tuple(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
+
+@app.route("/api/embed")
+def generate_embed():
+    title = request.args.get("title", "Embed Title")[:256]
+    description = request.args.get("description", "Embed description goes here.")[:2048]
+    color = request.args.get("color", "#5865F2")
+
+    if not re.fullmatch(r"#?[0-9a-fA-F]{6}", color):
+        color = "#5865F2"
+    if not color.startswith("#"):
+        color = "#" + color
+
+    rgb_color = hex_to_rgb(color)
+
+    width = 600
+    height = 200
+
+    img = Image.new("RGB", (width, height), (54, 57, 63))  # Discord embed background
+    draw = ImageDraw.Draw(img)
+
+    draw.rectangle([0, 0, 6, height], fill=rgb_color)  # color strip
+
+    try:
+        title_font = ImageFont.truetype("arial.ttf", 22)
+        desc_font = ImageFont.truetype("arial.ttf", 16)
+    except:
+        title_font = ImageFont.load_default()
+        desc_font = ImageFont.load_default()
+
+    draw.text((20, 20), title, font=title_font, fill=(0, 186, 255))  # title
+    draw.text((20, 60), description, font=desc_font, fill=(220, 221, 222))  # description
+
+    buffer = BytesIO()
+    img.save(buffer, format="PNG")
+    buffer.seek(0)
+    return send_file(buffer, mimetype="image/png")
